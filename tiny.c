@@ -18,7 +18,8 @@ typedef struct rangeNode {
 void doit(int fd);
 void read_requesthdrs(rio_t *rp, rangeNode *nodePtr);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize, int size_flag);
+void serve_static(int fd, char *filename, int filesize, int size_flag,
+    rangeNode *nodePtr);
 void get_filetype(char *filename, char *filetype);
 void serve_dynamic(int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, 
@@ -203,13 +204,57 @@ void serve_static(int fd, char *filename, int filesize, int size_flag)
 {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
+  int length = 0;
+  int validity = 0;
   size_t writesize;
 
   /* Send response headers to client */
   get_filetype(filename, filetype);       //line:netp:servestatic:getfiletype
-  sprintf(buf, "HTTP/1.0 200 OK\r\n");    //line:netp:servestatic:beginserve
-  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
-  sprintf(buf, "%sConnection: close\r\n", buf);
+  /* Request with no specific range is sent, set length to file size */
+  if (nodePtr->type == 0) {
+    sprintf(buf, "HTTP/1.0 200 OK\r\n");    //line:netp:servestatic:beginserve
+    sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+    sprintf(buf, "%sConnection: close\r\n", buf);
+    length = filesize;
+  }
+ /* RANGE TYPE 1: bytes r1-r2 */
+  else if (nodePtr->type == 1) {
+    /*Check if range is to equal the entire file. If it is, return request like
+ *    no range was specified at all. Set length to the filesize. */
+    if ((nodePtr->first == 0) && (nodePtr->second == filesize - 1)) {
+      sprintf(buf, "HTTP/1.0 200 OK\r\n");  //line:netp:servestatic:beginserve
+      sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+      sprintf(buf, "%sConnection: close\r\n", buf);
+      length = filesize;
+    }
+    /* Check if r1 > filesize or if r1 > r2. If it is, return appropriate 
+ *     error headers, set validilty and set length */
+    else if ((nodePtr->first > filesize)||(nodePtr->first > nodePtr->second)) {
+      sprintf(buf, "HTTP/1.1 416 Range Not Satisfiable\r\n"); //line:netp:servestatic:beginserve
+      sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+      sprintf(buf, "%sConnection: close\r\n", buf);
+      sprintf(buf, "%sAccept-Ranges: bytes\r\n", buf);
+      sprintf(buf, "%sContent-Range: bytes */%d\r\n", buf, filesize);
+      length = 0;
+      validity = 1;
+    }
+    /*Check if r2 > filesize. If it is, return appropriate headers and set
+ *    length  */
+    else {
+      if (nodePtr->second >= filesize) {
+        nodePtr->second = filesize - 1;
+        length = 1 + nodePtr->second - nodePtr->first;
+      }
+      else
+        length = 1 + nodePtr->second - nodePtr->first;
+      sprintf(buf, "HTTP/1.1 206 Partial Content\r\n");    //line:netp:servestatic:beginserve
+      sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+      sprintf(buf, "%sConnection: close\r\n", buf);
+      sprintf(buf, "%sAccept-Ranges: bytes\r\n", buf);
+      sprintf(buf, "%sContent-Range: bytes %d-%d/%d\r\n", buf, nodePtr->first, 
+              nodePtr->second, filesize);
+    }
+  }
   if (size_flag == 1) {
     sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
   }
