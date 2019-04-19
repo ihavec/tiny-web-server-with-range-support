@@ -322,22 +322,25 @@ void serve_static(int fd, char *filename, int filesize, int size_flag)
               nodePtr->second, filesize);
     }
   }
-  if (size_flag == 1) {
-    sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
+  /*Now check for validity */
+  if (vailidty == 0) {
+    if (size_flag == 1)
+      sprintf(buf, "%sContent-length: %d\r\n", buf, length);
+    sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
   }
-  sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
+   
   writesize = strlen(buf);
   if (rio_writen(fd, buf, strlen(buf)) < writesize) {
     printf("errors writing to client.\n");       //line:netp:servestatic:endserve
   }
   printf("Response headers:\n");
   printf("%s", buf);
-
-  /* Send response body to client */
-  srcfd = Open(filename, O_RDONLY, 0);    //line:netp:servestatic:open
-  srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);//line:netp:servestatic:mmap
-  Close(srcfd);                           //line:netp:servestatic:close
-  if (rio_writen(fd, srcp, filesize) < filesize) {
+  if (validity == 0) {
+    /* Send response body to client */
+    srcfd = Open(filename, O_RDONLY, 0);    //line:netp:servestatic:open
+    srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);//line:netp:servestatic:mmap
+    Close(srcfd);                           //line:netp:servestatic:close
+  if (rio_writen(fd, srcp + nodePtr->first, length) < filesize) {
     printf("errors writing to client.\n");         //line:netp:servestatic:write
   }
   Munmap(srcp, filesize);                 //line:netp:servestatic:munmap
