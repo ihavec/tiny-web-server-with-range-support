@@ -11,7 +11,7 @@ There are three type of ranges a browser can request:
 
 Response status:
 ● Non range request has response status line as below:
-  ○ HTTP/1.1 200 OK
+	○ HTTP/1.1 200 OK
 
 ● A valid range request should have the status line as this:
   ○ HTTP/1.1 206 Partial Content
