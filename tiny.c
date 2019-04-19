@@ -92,7 +92,7 @@ void doit(int fd)
           "Tiny couldn't read the file");
       return;
     }
-    serve_static(fd, filename, sbuf.st_size, is_static);        //line:netp:doit:servestatic
+    serve_static(fd, filename, sbuf.st_size, is_static, &range);        //line:netp:doit:servestatic
   }
   else { /* Serve dynamic content */
     if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) { //line:netp:doit:executable
@@ -200,7 +200,8 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
  * size_flag is 2, do not provide content-length
  */
 /* $begin serve_static */
-void serve_static(int fd, char *filename, int filesize, int size_flag) 
+void serve_static(int fd, char *filename, int filesize, int size_flag, 
+    rangeNode *nodePtr) 
 {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
@@ -219,8 +220,8 @@ void serve_static(int fd, char *filename, int filesize, int size_flag)
   }
  /* RANGE TYPE 1: bytes = r1-r2 */
   else if (nodePtr->type == 1) {
-    /*Check if range is to equal the entire file. If it is, return request like
- *    no range was specified at all. Set length to the filesize. */
+    /*Check if range is to equal the entire file. If it is, return request 
+ *    like no range was specified at all. Set length to the filesize. */
     if ((nodePtr->first == 0) && (nodePtr->second == filesize - 1)) {
       sprintf(buf, "HTTP/1.0 200 OK\r\n");  //line:netp:servestatic:beginserve
       sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
@@ -247,7 +248,7 @@ void serve_static(int fd, char *filename, int filesize, int size_flag)
       }
       else
         length = 1 + nodePtr->second - nodePtr->first;
-      sprintf(buf, "HTTP/1.1 206 Partial Content\r\n");    //line:netp:servestatic:beginserve
+      sprintf(buf, "HTTP/1.1 206 Partial Content\r\n");   //line:netp:servestatic:beginserve
       sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
       sprintf(buf, "%sConnection: close\r\n", buf);
       sprintf(buf, "%sAccept-Ranges: bytes\r\n", buf);
@@ -257,10 +258,10 @@ void serve_static(int fd, char *filename, int filesize, int size_flag)
   }
  /*RANGE TYPE 2: bytes = r1- */
   else if (nodePtr->type == 2) {
-    /* Check if range is to equal the entire file. If it is, return request like 
- *     no range was specified at all. Set length to the filesize */
+    /* Check if range is to equal the entire file. If it is, return request 
+ *     like no range was specified at all. Set length to the filesize */
     if (nodePtr->first == 0) {
-      sprintf(buf, "HTTP/1.0 200 OK\r\n");    //line:netp:servestatic:beginserve
+      sprintf(buf, "HTTP/1.0 200 OK\r\n");  //line:netp:servestatic:beginserve
       sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
       sprintf(buf, "%sConnection: close\r\n", buf);
       length = filesize;
@@ -283,21 +284,20 @@ void serve_static(int fd, char *filename, int filesize, int size_flag)
       sprintf(buf, "%sConnection: close\r\n", buf);
       sprintf(buf, "%sAccept-Ranges: bytes\r\n", buf);
       sprintf(buf, "%sContent-Range: bytes %d-%d/%d\r\n", buf, nodePtr->first, 
-              nodePtr->second, filesize);
-      nodePtr->second = filesize - 1;                                           
-      contentLength = 1 + nodePtr->second - nodePtr->first; 
+              (filesize-1), filesize);                                         
+      length = filesize - nodePtr->first; 
     }     
   }
   /* RANGE TYPE 3: bytes = -r1 */
   else if (nodePtr->type == 3) {
-    /* Check if length is 0. If it is, return appropriate error headers,
+    /* Check if length is 0. If it is, return appropriate rror headers,
  *     set validity and set length */
     if (nodePtr->first == 0) {
       sprintf(buf, "HTTP/1.1 416 Range Not Satisfiable\r\n");    //line:netp:servestatic:beginserve
       sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
       sprintf(buf, "%sConnection: close\r\n", buf);
       sprintf(buf, "%sAccept-Ranges: bytes\r\n", buf);
-      sprintf(buf, "%sContent-Range: bytes */%d\r\n", buf, filesize)
+      sprintf(buf, "%sContent-Range: bytes */%d\r\n", buf, filesize);
       validity = 1;
       length = 0;
     }
@@ -323,7 +323,7 @@ void serve_static(int fd, char *filename, int filesize, int size_flag)
     }
   }
   /*Now check for validity */
-  if (vailidty == 0) {
+  if (validity == 0) {
     if (size_flag == 1)
       sprintf(buf, "%sContent-length: %d\r\n", buf, length);
     sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
@@ -340,10 +340,11 @@ void serve_static(int fd, char *filename, int filesize, int size_flag)
     srcfd = Open(filename, O_RDONLY, 0);    //line:netp:servestatic:open
     srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);//line:netp:servestatic:mmap
     Close(srcfd);                           //line:netp:servestatic:close
-  if (rio_writen(fd, srcp + nodePtr->first, length) < filesize) {
-    printf("errors writing to client.\n");         //line:netp:servestatic:write
-  }
+    if (rio_writen(fd, srcp + nodePtr->first, length) < length) {
+      printf("errors writing to client.\n");         //line:netp:servestatic:write
+    }
   Munmap(srcp, filesize);                 //line:netp:servestatic:munmap
+  }
 }
 
 /*
