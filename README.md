@@ -13,21 +13,21 @@ how a real Web Server works. Use for instructional purposes only.
 The compiles and runs cleanly on W204 machines or Vagrant that has Centos6.10   
 instsalled, running Linux kernel 2.6.32 and gcc version 4.4.7.                  
                                                                                 
-To compile Tiny:                                                                
-  Type "make"                                                                   
+To compile Tiny:
+	Type "make"                                                                   
                                                                                 
-To run Tiny:                                                                    
-  Type "tiny <port>" on the server machine,                                     
-    e.g. "tiny 8080".                                                           
-  Point your browser at Tiny:                                                   
-    static content: http://<host>:8080                                          
-    dynamic content: http://<host>:8080/cgi-bin/adder?1&2                       
+To run Tiny:
+	Type "tiny <port>" on the server machine,
+		e.g. "tiny 8080".
+	Point your browser at Tiny:
+		static content: http://<host>:8080
+		dynamic content: http://<host>:8080/cgi-bin/adder?1&2                       
                                                                                 
 For debugging purposes, you should consider using command line browser curl.    
 It has options (-v for verbose) where it will print out debugging               
 info about the connections it makes to the server, the request headers it       
-sends to the server and the response headers it receives from the webserver.    
-  curl -v http://<host>:8080                                                    
+sends to the server and the response headers it receives from the webserver.
+	curl -v http://<host>:8080                                                    
                                                                                 
                                                                                 
 Files:                                                                          
