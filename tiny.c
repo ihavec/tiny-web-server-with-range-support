@@ -217,7 +217,7 @@ void serve_static(int fd, char *filename, int filesize, int size_flag)
     sprintf(buf, "%sConnection: close\r\n", buf);
     length = filesize;
   }
- /* RANGE TYPE 1: bytes r1-r2 */
+ /* RANGE TYPE 1: bytes = r1-r2 */
   else if (nodePtr->type == 1) {
     /*Check if range is to equal the entire file. If it is, return request like
  *    no range was specified at all. Set length to the filesize. */
@@ -254,6 +254,39 @@ void serve_static(int fd, char *filename, int filesize, int size_flag)
       sprintf(buf, "%sContent-Range: bytes %d-%d/%d\r\n", buf, nodePtr->first, 
               nodePtr->second, filesize);
     }
+  }
+ /*RANGE TYPE 2: bytes = r1- */
+  else if (nodePtr->type == 2) {
+    /* Check if range is to equal the entire file. If it is, return request like 
+ *     no range was specified at all. Set length to the filesize */
+    if (nodePtr->first == 0) {
+      sprintf(buf, "HTTP/1.0 200 OK\r\n");    //line:netp:servestatic:beginserve
+      sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+      sprintf(buf, "%sConnection: close\r\n", buf);
+      length = filesize;
+    }
+    /* Check if r1 > filesize. If it is, return appropriate error headers,
+ *     set length and set validity. */
+    else if (nodePtr->first >= filesize) {
+      sprintf(buf, "HTTP/1.1 416 Range Not Satisfiable\r\n");    //line:netp:servestatic:beginserve
+      sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+      sprintf(buf, "%sConnection: close\r\n", buf);
+      sprintf(buf, "%sAccept-Ranges: bytes\r\n", buf);
+      sprintf(buf, "%sContent-Range: bytes */%d\r\n", buf, filesize);
+      validity = 1;
+      length = 0;
+    }
+    /*Otherwise, set r2 to EOF and return partial headers */
+    else {
+      sprintf(buf, "HTTP/1.1 206 Partial Content\r\n");    //line:netp:servestatic:beginserve
+      sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+      sprintf(buf, "%sConnection: close\r\n", buf);
+      sprintf(buf, "%sAccept-Ranges: bytes\r\n", buf);
+      sprintf(buf, "%sContent-Range: bytes %d-%d/%d\r\n", buf, nodePtr->first, 
+              nodePtr->second, filesize);
+      nodePtr->second = filesize - 1;                                           
+      contentLength = 1 + nodePtr->second - nodePtr->first; 
+    }     
   }
   if (size_flag == 1) {
     sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
