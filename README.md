@@ -1,6 +1,6 @@
 Tiny Web server so that it cansupport http requests that asks for a range of a resource rather than the whole resource.
 
-Supporting range request can make network communication more efficient when transferringlarge files. The browser can resume getting part of a large file if previous transmission onlypartially succeeded. For large media files, range request must be supported to make it possibleto select random position to play. In particular, Safari web browser will not play any large mediafile at all if range request is not supported.
+Supporting range request can make network communication more efficient when transferring large files. The browser can resume getting part of a large file if previous transmission onlypartially succeeded. For large media files, range request must be supported to make it possibleto select random position to play. In particular, Safari web browser will not play any large mediafile at all if range request is not supported.
 
 Your task for this assignment is to produce the right response based on the value of thisrangeNode struct's value. If there was no valid range request, your tiny web server should returnthe same response and file content as before, but if there is a valid range request, then your tinyweb server's response has to accommodate the range requests. This includes the following changes you will have to make to your response.Understand ranges:
 
@@ -30,4 +30,4 @@ Response headers for range request:
 ● Accept-Ranges: bytes
   ○ should always be included to acknowledge the browser that we support rangerequest with units being bytes
   
-The file content that we sent back should only be the bytes corresponding to the valid range, notthe whole file. 
+The file content that we sent back should only be the bytes corresponding to the valid range, not the whole file. 
