@@ -1,5 +1,6 @@
 /* $begin tinymain */
 /*
+ * <Mrigank Doshy       911248894>
  * tiny.c - A simple, iterative HTTP/1.0 Web server that uses the 
  *     GET method to serve static and dynamic content.
  */
