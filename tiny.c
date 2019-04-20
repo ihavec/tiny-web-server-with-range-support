@@ -212,7 +212,8 @@ void serve_static(int fd, char *filename, int filesize, int size_flag,
 
   /* Send response headers to client */
   get_filetype(filename, filetype);       //line:netp:servestatic:getfiletype
-  /* Request with no specific range is sent, set length to file size */
+  /* If a request with no specific range is sent, 
+ *  set length to the filesize and print appropriately. */
   if (nodePtr->type == 0) {
     sprintf(buf, "HTTP/1.0 200 OK\r\n");    //line:netp:servestatic:beginserve
     sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
@@ -221,16 +222,22 @@ void serve_static(int fd, char *filename, int filesize, int size_flag,
   }
  /* RANGE TYPE 1: bytes = r1-r2 */
   else if (nodePtr->type == 1) {
-    /*Check if range is to equal the entire file. If it is, return request 
- *    like no range was specified at all. Set length to the filesize. */
+    /* 1. Check if range is equal to the entire file. 
+ *     2. If it is, return request like no range was specified at all. 
+ *     3. Set the length to be the filesize. 
+ *  */
     if ((nodePtr->first == 0) && (nodePtr->second == filesize - 1)) {
       sprintf(buf, "HTTP/1.0 200 OK\r\n");  //line:netp:servestatic:beginserve
       sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
       sprintf(buf, "%sConnection: close\r\n", buf);
       length = filesize;
     }
-    /* Check if r1 > filesize or if r1 > r2. If it is, return appropriate 
- *     error headers, set validilty and set length */
+    /* This is an edge case: 
+ *     1. Check if r1 > filesize or if r1 > r2. 
+ *     2. If it is, return appropriate error header of Range not Satisfiable.
+ *     3. Print the Accepted Range Bytes and the Content Range Bytes. 
+ *     4. Set validilty to be invalid and set length to 0. 
+ *  */
     else if ((nodePtr->first > filesize)||(nodePtr->first > nodePtr->second)) {
       sprintf(buf, "HTTP/1.1 416 Range Not Satisfiable\r\n"); //line:netp:servestatic:beginserve
       sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
@@ -240,8 +247,11 @@ void serve_static(int fd, char *filename, int filesize, int size_flag,
       length = 0;
       validity = 1;
     }
-    /*Check if r2 > filesize. If it is, return appropriate headers and set
- *    length  */
+    /* 1. Check if r2 > filesize. 
+ *     2. If it is, set r2 to filesize - 1 and length to filesize - r1
+ *     3. Otherwise, print header of Partial Content.
+ *     4. Also print Content Range Bytes as r1, r2, filesize. 
+ *  */
     else {
       if (nodePtr->second >= filesize) {
         nodePtr->second = filesize - 1;
@@ -259,16 +269,22 @@ void serve_static(int fd, char *filename, int filesize, int size_flag,
   }
  /*RANGE TYPE 2: bytes = r1- */
   else if (nodePtr->type == 2) {
-    /* Check if range is to equal the entire file. If it is, return request 
- *     like no range was specified at all. Set length to the filesize */
+    /* 1. Check if range is equal to the entire file. 
+ *     2. If it is, return request like no range was specified at all. 
+ *     3. Set length to be the filesize 
+ *  */
     if (nodePtr->first == 0) {
       sprintf(buf, "HTTP/1.0 200 OK\r\n");  //line:netp:servestatic:beginserve
       sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
       sprintf(buf, "%sConnection: close\r\n", buf);
       length = filesize;
     }
-    /* Check if r1 > filesize. If it is, return appropriate error headers,
- *     set length and set validity. */
+    /* This is an edge case:
+ *     1. Check if r1 > filesize. 
+ *     2. If it is, return appropriate error header of Range Not Satisfiable.
+ *     3. Print the range accepted and the content range.
+ *     4. Set validity to be invalid and set length to 0. 
+ *  */
     else if (nodePtr->first >= filesize) {
       sprintf(buf, "HTTP/1.1 416 Range Not Satisfiable\r\n");    //line:netp:servestatic:beginserve
       sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
@@ -278,7 +294,11 @@ void serve_static(int fd, char *filename, int filesize, int size_flag,
       validity = 1;
       length = 0;
     }
-    /*Otherwise, set r2 to EOF and return partial headers */
+    /* 1. Otherwise, print header Partial Content.
+ *     2. Print Accepted Range Bytes and Content Range Bytes as r1, 
+ *        filesize - 1 and filesize
+ *     3. Set length as filesize - r1.
+ *  */
     else {
       sprintf(buf, "HTTP/1.1 206 Partial Content\r\n");    //line:netp:servestatic:beginserve
       sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
@@ -291,8 +311,10 @@ void serve_static(int fd, char *filename, int filesize, int size_flag,
   }
   /* RANGE TYPE 3: bytes = -r1 */
   else if (nodePtr->type == 3) {
-    /* Check if length is 0. If it is, return appropriate rror headers,
- *     set validity and set length */
+    /* 1. Check if length is 0. 
+ *     2. If it is, Print appropriate error header of Range Not Satisfiable.
+ *     3. Set validity to invalid and set length to 0. 
+ *  */
     if (nodePtr->first == 0) {
       sprintf(buf, "HTTP/1.1 416 Range Not Satisfiable\r\n");    //line:netp:servestatic:beginserve
       sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
@@ -304,7 +326,19 @@ void serve_static(int fd, char *filename, int filesize, int size_flag,
     }
     /* Otherwise compute length, r1, r2 and then return partial headers. */
     else {
-      /* First check if r1 >= filesize. If it is, set length to filesize */
+      /* 1. First check if r1 >= filesize. 
+ *       2. If it is, set r1 to 0. 
+ *       3. Set r2 to filesize - 1
+ *       4. Set length to be the filesize
+ *
+ *       5. If it is not, set length to be r1
+ *       6. Set r1 to be filesize - r1
+ *       7. And set r2 to filesize - 1
+ *
+ *       8. Then print header of Partial Content
+ *       9. Also print Acceted Range Bytes and Content Range Bytes of r1, r2 
+ *          and filesize. 
+ *    */
       if (abs(nodePtr->first) >= filesize) {
         nodePtr->first = 0;
         nodePtr->second = filesize - 1;
@@ -323,7 +357,7 @@ void serve_static(int fd, char *filename, int filesize, int size_flag,
               nodePtr->second, filesize);
     }
   }
-  /*Now check for validity */
+  /* Now check for validity. */
   if (validity == 0) {
     if (size_flag == 1)
       sprintf(buf, "%sContent-length: %d\r\n", buf, length);
