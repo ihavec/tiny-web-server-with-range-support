@@ -1,4 +1,5 @@
-Tiny Web server with Range support
+# For my purpose only. Do not copy for any CMPSC 311 assignments.
+## Tiny Web server with Range support
 
 This is the home directory for the Tiny server, a web server used in 
 the textbook CSAPP3e. Tiny uses the GET method to serve static content
